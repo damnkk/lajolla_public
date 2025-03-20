@@ -18,10 +18,15 @@
 			<float name="intIOR" value="1.9"/>
 		</bsdf> -->
 
-		<bsdf type="roughdielectric">
-			<float name="intIOR" value="1.33"/>
-			<float name="alpha" value="0.0001"/>
+		<bsdf type="diffuse">
+			<rgb name="reflectance" value="0.8 0.4 0.1"/>
 		</bsdf>
+
+		<!-- <bsdf type="disneydiffuse">
+			<rgb name="baseColor" value="0.8 0.4 0.1"/>
+			<float name="roughness" value="0.0"/>
+			<float name="subsurface" value="0.0"/>
+		</bsdf> -->
 	</shape>
 
 	<sensor type="perspective" id="Camera-camera">
@@ -33,7 +38,7 @@
 		</transform>
 
 		<sampler type="ldsampler">
-			<integer name="sampleCount" value="64"/>
+			<integer name="sampleCount" value="640"/>
 		</sampler>
 
 		<film type="hdrfilm" id="film">

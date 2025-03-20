@@ -45,3 +45,7 @@ build/
 
 #vscode related
 .vscode
+cmake-build-debug-visual-studio
+.cache
+.idea
+.vs
