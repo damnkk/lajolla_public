@@ -42,10 +42,10 @@ Spectrum eval_op::operator()(const DisneyMetal &bsdf) const {
     Real hlx = dot(frame.x, h);
     Real hly = dot(frame.y, h);
     Real hlz = dot(frame.n, h);
-    Real hlxyz = ((hlx * hlx) / pow(ax, 2.0) + (hlx * hlx) / pow(ax, 2.0) +
-                  (hlx * hlx) / pow(ax, 2.0)) *
-                 ((hlx * hlx) / pow(ax, 2.0) + (hlx * hlx) / pow(ax, 2.0) +
-                  (hlx * hlx) / pow(ax, 2.0));
+    Real hlxyz = ((hlx * hlx) / pow(ax, 2.0) + (hly * hly) / pow(ay, 2.0) +
+                  (hlz * hlz)) *
+                      ((hlx * hlx) / pow(ax, 2.0) + (hly * hly) / pow(ay, 2.0) +
+                       (hlz * hlz));
     Real D = 1.0 / (c_PI * ax * ay * hlxyz);
     return Fresnel * G * D / (4.0 * dot(vertex.shading_frame.n, dir_in));
 }
@@ -79,10 +79,10 @@ Real pdf_sample_bsdf_op::operator()(const DisneyMetal &bsdf) const {
     Real hlx = dot(frame.x, h);
     Real hly = dot(frame.y, h);
     Real hlz = dot(frame.n, h);
-    Real hlxyz = ((hlx * hlx) / pow(ax, 2.0) + (hlx * hlx) / pow(ax, 2.0) +
-                  (hlx * hlx) / pow(ax, 2.0)) *
-                 ((hlx * hlx) / pow(ax, 2.0) + (hlx * hlx) / pow(ax, 2.0) +
-                  (hlx * hlx) / pow(ax, 2.0));
+    Real hlxyz = ((hlx * hlx) / pow(ax, 2.0) + (hly * hly) / pow(ay, 2.0) +
+                  (hlz * hlz)) *
+                      ((hlx * hlx) / pow(ax, 2.0) + (hly * hly) / pow(ay, 2.0) +
+                       (hlz * hlz));
     Real D = 1.0 / (c_PI * ax * ay * hlxyz);
     Real pdf = D * G / (4.0 * abs(dot(vertex.shading_frame.n, dir_in)));
     return pdf;
@@ -119,36 +119,12 @@ std::optional<BSDFSampleRecord>
     Real aspect = sqrt(1.0 - anisotropic * 0.9);
     Real ax = max(0.001, roughness * roughness / aspect);
     Real ay = max(0.001, roughness * roughness * aspect);
-    Spectrum Vh = normalize(Spectrum(ax * dir_in.x, ay * dir_in.y, dir_in.z));
-    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
-    Spectrum T1 = lensq > 0.0 ? Spectrum(-Vh.y, Vh.x, 0.0) * (1.0 / sqrt(lensq))
-                              : Spectrum(1.0, 0.0, 0.0);
-    Spectrum T2 = cross(Vh, T1);
-    Real r = sqrt(rnd_param_uv.x);
-    Real phi = 2.0 * c_PI * rnd_param_uv.y;
-    Real t1 = r * cos(phi);
-    Real t2 = r * sin(phi);
-    Real s = 0.5 * (1.0 - Vh.z);
-    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
-    Spectrum Nh =
-        t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
-    Spectrum Ne = normalize(Spectrum(ax * Nh.x, ay * Nh.y, max(0.0, Nh.z)));
-    return BSDFSampleRecord{Ne, 0, roughness};
 
-    // Vector3 local_dir_in = to_local(frame, dir_in);
-    // Real roughness = eval(
-    //     bsdf.roughness, vertex.uv, vertex.uv_screen_size, texture_pool);
-    // roughness = std::clamp(roughness, Real(0.01), Real(1));
-    // Real alpha = roughness * roughness;
-    // Vector3 local_micro_normal =
-    //     sample_visible_normals(local_dir_in, alpha, rnd_param_uv);
-    //
-    // Vector3 half_vector = to_world(frame, local_micro_normal);
-    // Vector3 reflected = normalize(-dir_in + 2 * dot(dir_in, half_vector) * half_vector);
-    // return BSDFSampleRecord{
-    //     reflected,
-    //     Real(0) /* eta */, roughness /* roughness */
-    // };
+    Spectrum Ne = VNDFSample(dir_in, ax, ay, rnd_param_uv);
+    Ne = to_world(frame,Ne);
+    Spectrum refelct = normalize(-dir_in+2.0*dot(dir_in,Ne)*Ne);
+    return BSDFSampleRecord{refelct, 0, roughness};
+
 }
 
 TextureSpectrum get_texture_op::operator()(const DisneyMetal &bsdf) const {

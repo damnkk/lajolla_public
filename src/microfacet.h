@@ -66,6 +66,64 @@ inline Real GGX(Real n_dot_h, Real roughness) {
     return GTR2(n_dot_h, roughness);
 }
 
+/// GGX with disney mapping
+inline Real Disney_GGX(Real anisotropic, Real roughness, Vector3 h_l) {
+    Real aspect = sqrt(Real(1) - Real(0.9) * anisotropic);
+    Real a_min = Real(0.0001);
+    Real a_x = max(a_min, pow(roughness, 2) / aspect);
+    Real a_y = max(a_min, pow(roughness, 2) * aspect);
+
+    Real t = (pow(h_l.x, 2) / pow(a_x, 2)) + (pow(h_l.y, 2) / pow(a_y, 2)) + pow(h_l.z, 2);
+    Real D_m = 1 / (c_PI * a_x * a_y * pow(t, 2));
+
+    return D_m;
+}
+
+/// Smith with disney mapping
+inline Real Disney_Smith(Real anisotropic, Real roughness, Vector3 w, Frame frame) {
+    Real aspect = sqrt(Real(1) - Real(0.9) * anisotropic);
+    Real a_min = Real(0.0001);
+    Real a_x = max(a_min, pow(roughness, 2) / aspect);
+    Real a_y = max(a_min, pow(roughness, 2) * aspect);
+    Vector3 w_l = to_local(frame, w);
+
+    Real t = (pow(w_l.x * a_x, 2) + pow(w_l.y * a_y, 2)) / pow(w_l.z, 2);
+
+    Real Lamda = (sqrt(Real(1) + t) - Real(1)) / 2;
+    Real G_w = Real(1) / (Real(1) + Lamda);
+
+    return G_w;
+}
+
+
+inline Spectrum VNDFSample(const Vector3& V,Real ax, Real ay,Vector2 rnd)
+{
+    if (V.z < 0) {
+        // Ensure the input is on top of the surface.
+        return -VNDFSample(-V, ax,ay, rnd);
+    }
+    // 微平面模型本身就是椭球模型，所以入射的向量本身就是椭球系的一部分，我们接下来要在半球系进行计算，那么就需要
+    //先把法线转换到半球系，这里固定的计算方法
+    Spectrum Vh = normalize(Spectrum(ax * V.x, ay * V.y, V.z));
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    //算完之后，想办法求出T1，T2两个正交向量，和Vh组合成了一个三角系
+    Spectrum T1 = lensq > 0.0 ? Spectrum(-Vh.y, Vh.x, 0.0) * (1.0 / sqrt(lensq))
+                              : Spectrum(1.0, 0.0, 0.0);
+    Spectrum T2 = cross(Vh, T1);
+    Real r = sqrt(rnd.x);
+    Real phi = 2.0 * c_PI * rnd.y;
+    Real t1 = r * cos(phi);
+    Real t2 = r * sin(phi);
+    Real s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+    Spectrum Nh =
+        t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
+    //你虽然是将一个世界空间的view向量扔给了这个函数，但是实际上整个采样的建模都是针对一个上半椭球/圆球的
+    //此时的计算和只和viewdir有关，经过建模计算之后，返回一个
+    Spectrum Ne = normalize(Spectrum(ax * Nh.x, ay * Nh.y, max(0.0, Nh.z)));
+    return Ne;
+}
+
 /// The masking term models the occlusion between the small mirrors of the microfacet models.
 /// See Eric Heitz's paper "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"
 /// for a great explanation.
