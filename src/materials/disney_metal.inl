@@ -2,9 +2,10 @@
 #include "matrix.h"
 
 
-Real GTR(Spectrum v, Real ax, Real ay) {
+Real GTR(Spectrum v, Real ax, Real ay,Frame frame) {
+    Spectrum wl = to_local(frame,v);
   Real A =
-      (sqrt(1.0 + ((pow(v.x * ax, 2.0) + pow(v.y * ay, 2.0)) / pow(v.z, 2.0))) -
+      (sqrt(1.0 + ((pow(wl.x * ax, 2.0) + pow(wl.y * ay, 2.0)) / pow(wl.z, 2.0))) -
        1.0) /
       2.0;
   return 1.0 / (1.0 + A);
@@ -38,7 +39,7 @@ Spectrum eval_op::operator()(const DisneyMetal &bsdf) const {
     Real ax = max(0.001, roughness * roughness / aspect);
     Real ay = max(0.001, roughness * roughness * aspect);
     // Real G = GTR(dir_in, ax, ay) * GTR(dir_out, ax, ay);
-    Real G = GTR(dir_in, ax, ay) * GTR(dir_out, ax, ay);
+    Real G = GTR(dir_in, ax, ay,frame) * GTR(dir_out, ax, ay,frame);
     Real hlx = dot(frame.x, h);
     Real hly = dot(frame.y, h);
     Real hlz = dot(frame.n, h);
@@ -74,7 +75,7 @@ Real pdf_sample_bsdf_op::operator()(const DisneyMetal &bsdf) const {
     Real aspect = sqrt(1.0 - anisotropic * 0.9);
     Real ax = max(0.001, roughness * roughness / aspect);
     Real ay = max(0.001, roughness * roughness * aspect);
-    Real G = GTR(dir_in, ax, ay);
+    Real G = GTR(dir_in, ax, ay,frame);
     Frame localFrame = Frame(h);
     Real hlx = dot(frame.x, h);
     Real hly = dot(frame.y, h);
@@ -119,8 +120,8 @@ std::optional<BSDFSampleRecord>
     Real aspect = sqrt(1.0 - anisotropic * 0.9);
     Real ax = max(0.001, roughness * roughness / aspect);
     Real ay = max(0.001, roughness * roughness * aspect);
-
-    Spectrum Ne = VNDFSample(dir_in, ax, ay, rnd_param_uv);
+    Vector3 local_dir_in = to_local(frame, dir_in);
+    Spectrum Ne = VNDFSample(local_dir_in, ax, ay, rnd_param_uv);
     Ne = to_world(frame,Ne);
     Spectrum refelct = normalize(-dir_in+2.0*dot(dir_in,Ne)*Ne);
     return BSDFSampleRecord{refelct, 0, roughness};
